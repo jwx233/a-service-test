@@ -3,13 +3,14 @@ package handler
 import (
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/jwx233s/a-service/pkg/db"
 	"github.com/jwx233s/a-service/pkg/response"
 )
 
-// POST /api/db/update?table=user&id=1
-// POST /api/db/update?table=user&user_id=123
+// POST /api/db/update/user?id=1
+// POST /api/db/update/user?json.user_id=123
 // Body: {"json": {"name": "Jerry"}}
 func Handler(w http.ResponseWriter, r *http.Request) {
 	response.SetHeaders(w)
@@ -17,9 +18,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	table := r.URL.Query().Get("table")
+	table := extractTableName(r.URL.Path, "update")
 	if table == "" {
-		response.Error(w, "Missing 'table'", 400)
+		response.Error(w, "Missing table name", 400)
 		return
 	}
 	if !db.AllowedTables[table] {
@@ -29,7 +30,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	filter := db.BuildFilter(r)
 	if filter == "" {
-		response.Error(w, "Missing 'id' or 'user_id'", 400)
+		response.Error(w, "Missing filter (id or json.xxx)", 400)
 		return
 	}
 
@@ -45,4 +46,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, data)
+}
+
+func extractTableName(path, action string) string {
+	prefix := "/api/db/" + action + "/"
+	if strings.HasPrefix(path, prefix) {
+		table := strings.TrimPrefix(path, prefix)
+		return strings.Split(table, "/")[0]
+	}
+	return ""
 }

@@ -3,6 +3,7 @@ package db
 import (
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -41,15 +42,38 @@ func Delete(table, filter string) ([]byte, error) {
 	return request("DELETE", endpoint, "")
 }
 
-// 构建过滤条件
+// 构建过滤条件（支持 id 和 jsonb 字段搜索）
+// 示例:
+//   ?id=1                     -> id=eq.1
+//   ?json.user_id=123         -> json->user_id=eq.123
+//   ?json.name=Tom            -> json->name=eq.Tom
+//   ?json.status=cs.active    -> json->status=cs.active (contains)
 func BuildFilter(r *http.Request) string {
 	var filters []string
-	if id := r.URL.Query().Get("id"); id != "" {
-		filters = append(filters, "id=eq."+id)
+
+	for key, values := range r.URL.Query() {
+		if len(values) == 0 {
+			continue
+		}
+		value := values[0]
+
+		if key == "id" {
+			// 普通 id 查询
+			filters = append(filters, "id=eq."+value)
+		} else if strings.HasPrefix(key, "json.") {
+			// jsonb 字段查询: json.user_id=123 -> json->>user_id=eq.123
+			jsonKey := strings.TrimPrefix(key, "json.")
+			// 检查是否有操作符前缀 (eq, neq, gt, lt, gte, lte, like, cs, cd)
+			if strings.Contains(value, ".") {
+				// 已包含操作符: json.status=cs.active
+				filters = append(filters, "json->>"+jsonKey+"="+value)
+			} else {
+				// 默认 eq 操作符
+				filters = append(filters, "json->>"+jsonKey+"=eq."+url.QueryEscape(value))
+			}
+		}
 	}
-	if userID := r.URL.Query().Get("user_id"); userID != "" {
-		filters = append(filters, "user_id=eq."+userID)
-	}
+
 	return strings.Join(filters, "&")
 }
 
