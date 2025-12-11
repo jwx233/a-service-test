@@ -71,6 +71,13 @@ func BuildFilter(r *http.Request) string {
 				// 默认 eq 操作符
 				filters = append(filters, "json->>"+jsonKey+"=eq."+url.QueryEscape(value))
 			}
+		} else {
+			// jsonb 字段查询: user_id=123 -> json->>user_id=eq.123
+			if strings.Contains(value, ".") {
+				filters = append(filters, "json->>"+key+"="+value)
+			} else {
+				filters = append(filters, "json->>"+key+"=eq."+url.QueryEscape(value))
+			}
 		}
 	}
 
