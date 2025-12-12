@@ -60,7 +60,17 @@ var reservedParams = map[string]bool{
 // 规则:
 //   - id 参数查主键: ?id=1 -> id=eq.1
 //   - 其他参数查 jsonb 字段: ?user_id=123 -> json->>user_id=eq.123
-//   - 支持操作符: ?age=gt.18 -> json->>age=gt.18
+/*
+	操作符	含义	REST API 查询示例
+	gt	大于	age=gt.20
+	gte	大于等于	age=gte.18
+	lt	小于	age=lt.30
+	lte	小于等于	age=lte.60
+	eq	等于	id=eq.10
+	neq	不等于	status=neq.inactive
+	like	模糊匹配	name=like.%John%
+	ilike	不区分大小写的模糊匹配	name=ilike.%john%
+*/
 func BuildFilter(r *http.Request) string {
 	var filters []string
 
@@ -120,7 +130,6 @@ func buildJsonFilter(key, value string) string {
 		symbol := item.symbol
 		// 系统操作标识
 		op := item.op
-		
 		// 匹配：输入的参数内容以自定义标识开头
 		if strings.HasPrefix(value, symbol) {
 			// 去掉操作符符号
