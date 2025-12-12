@@ -98,12 +98,18 @@ func doGet(ctx *reqContext) ([]byte, error) {
 	return db.Select(ctx.table, query)
 }
 
+// wrapJsonBody 将 body 包装成 {"json": body} 格式
+func wrapJsonBody(body string) string {
+	return `{"json":` + body + `}`
+}
+
 // doInsert 新增操作
 func doInsert(ctx *reqContext) ([]byte, error) {
 	if ctx.body == "" {
 		return nil, fmt.Errorf("Missing body")
 	}
-	return db.Insert(ctx.table, ctx.body)
+	// 自动包装成 {"json": ...} 格式
+	return db.Insert(ctx.table, wrapJsonBody(ctx.body))
 }
 
 // doUpdate 更新操作，需要 filter 和 body
@@ -111,7 +117,8 @@ func doUpdate(ctx *reqContext) ([]byte, error) {
 	if ctx.filter == "" || ctx.body == "" {
 		return nil, fmt.Errorf("Missing filter or body")
 	}
-	return db.Update(ctx.table, ctx.filter, ctx.body)
+	// 自动包装成 {"json": ...} 格式
+	return db.Update(ctx.table, ctx.filter, wrapJsonBody(ctx.body))
 }
 
 // doDelete 删除操作，需要 filter
