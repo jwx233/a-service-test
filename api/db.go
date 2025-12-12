@@ -99,6 +99,8 @@ func doGet(ctx *reqContext) ([]byte, error) {
 	if ctx.filter != "" {
 		query += "&" + ctx.filter
 	}
+	// 调试: 打印最终查询
+	fmt.Printf("[DEBUG doGet] table=%s, query=%s\n", ctx.table, query)
 	return db.Select(ctx.table, query)
 }
 

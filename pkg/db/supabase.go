@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -20,68 +21,91 @@ var AllowedTables = map[string]bool{
 	"community": true,
 }
 
+// Debug 开关，生产环境设为 false
+var Debug = true
+
 // ============ CRUD 方法 ============
 
 func Select(table, query string) ([]byte, error) {
 	endpoint := SUPABASE_URL + "/rest/v1/" + table + "?" + query
+	debugLog("SELECT", endpoint, "")
 	return request("GET", endpoint, "")
 }
 
 func Insert(table, body string) ([]byte, error) {
 	endpoint := SUPABASE_URL + "/rest/v1/" + table
+	debugLog("INSERT", endpoint, body)
 	return request("POST", endpoint, body)
 }
 
 func Update(table, filter, body string) ([]byte, error) {
 	endpoint := SUPABASE_URL + "/rest/v1/" + table + "?" + filter
+	debugLog("UPDATE", endpoint, body)
 	return request("PATCH", endpoint, body)
 }
 
 func Delete(table, filter string) ([]byte, error) {
 	endpoint := SUPABASE_URL + "/rest/v1/" + table + "?" + filter
+	debugLog("DELETE", endpoint, "")
 	return request("DELETE", endpoint, "")
 }
 
-// 构建过滤条件（支持 id 和 jsonb 字段搜索）
-// 示例:
-//   ?id=1                     -> id=eq.1
-//   ?json.user_id=123         -> json->user_id=eq.123
-//   ?json.name=Tom            -> json->name=eq.Tom
-//   ?json.status=cs.active    -> json->status=cs.active (contains)
+// 系统保留参数，不作为查询条件
+var reservedParams = map[string]bool{
+	"action": true,
+	"table":  true,
+}
+
+// BuildFilter 构建过滤条件
+// 规则:
+//   - id 参数查主键: ?id=1 -> id=eq.1
+//   - 其他参数查 jsonb 字段: ?user_id=123 -> json->>user_id=eq.123
+//   - 支持操作符: ?age=gt.18 -> json->>age=gt.18
 func BuildFilter(r *http.Request) string {
 	var filters []string
 
+	debugLog("BuildFilter", "URL Query", r.URL.RawQuery)
+
 	for key, values := range r.URL.Query() {
+		debugLog("构建参数：",key,value)
 		if len(values) == 0 {
+			continue
+		}
+		// 跳过系统保留参数
+		if reservedParams[key] {
 			continue
 		}
 		value := values[0]
 
 		if key == "id" {
-			// 普通 id 查询
-			filters = append(filters, "id=eq."+value)
-		} else if strings.HasPrefix(key, "json.") {
-			// jsonb 字段查询: json.user_id=123 -> json->>user_id=eq.123
-			jsonKey := strings.TrimPrefix(key, "json.")
-			// 检查是否有操作符前缀 (eq, neq, gt, lt, gte, lte, like, cs, cd)
-			if strings.Contains(value, ".") {
-				// 已包含操作符: json.status=cs.active
-				filters = append(filters, "json->>"+jsonKey+"="+value)
-			} else {
-				// 默认 eq 操作符
-				filters = append(filters, "json->>"+jsonKey+"=eq."+url.QueryEscape(value))
-			}
+			// id 查主键
+			filter := "id=eq." + value
+			debugLog("BuildFilter", "id filter", filter)
+			filters = append(filters, filter)
 		} else {
-			// jsonb 字段查询: user_id=123 -> json->>user_id=eq.123
-			if strings.Contains(value, ".") {
-				filters = append(filters, "json->>"+key+"="+value)
-			} else {
-				filters = append(filters, "json->>"+key+"=eq."+url.QueryEscape(value))
-			}
+			// 其他参数都查 jsonb 字段
+			filter := buildJsonFilter(key, value)
+			debugLog("BuildFilter", key+" filter", filter)
+			filters = append(filters, filter)
 		}
 	}
 
-	return strings.Join(filters, "&")
+	result := strings.Join(filters, "&")
+	debugLog("BuildFilter", "Final filter", result)
+	return result
+}
+
+// buildJsonFilter 构建 jsonb 字段过滤条件
+func buildJsonFilter(key, value string) string {
+	// 去掉可选的 json. 前缀
+	key = strings.TrimPrefix(key, "json.")
+
+	// 值包含 . 说明带操作符: age=gt.18
+	if strings.Contains(value, ".") {
+		return "json->>" + key + "=" + value
+	}
+	// 默认 eq 操作符
+	return "json->>" + key + "=eq." + url.QueryEscape(value)
 }
 
 // ============ 内部方法 ============
@@ -100,8 +124,20 @@ func request(method, endpoint, body string) ([]byte, error) {
 
 	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
+		debugLog("Request", "Error", err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+
+	data, _ := io.ReadAll(resp.Body)
+	debugLog("Request", "Response Status", fmt.Sprintf("%d", resp.StatusCode))
+	debugLog("Request", "Response Body", string(data))
+	return data, nil
+}
+
+// debugLog 调试日志
+func debugLog(action, key, value string) {
+	if Debug {
+		fmt.Printf("[DEBUG] %s | %s: %s\n", action, key, value)
+	}
 }
