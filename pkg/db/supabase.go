@@ -15,11 +15,6 @@ const (
 	SUPABASE_KEY = "sb_publishable_eGii7SaCtXirDh2O5suItQ_L_eZtxuJ"
 )
 
-// 允许操作的表
-var AllowedTables = map[string]bool{
-	"user":      true,
-	"community": true,
-}
 
 // Debug 开关，生产环境设为 false
 var Debug = true

@@ -38,7 +38,7 @@ type reqContext struct {
 // 示例:
 //   GET  /api/db/get/user              - 查询 user 表全部
 //   GET  /api/db/get/user?id=1         - 按 id 查询
-//   GET  /api/db/get/user?json.name=Tom - 按 json 字段查询
+//   GET  /api/db/get/user?name=Tom - 按 json 字段查询
 //   POST /api/db/insert/user           - 新增记录
 //   POST /api/db/update/user?id=1      - 更新记录
 //   POST /api/db/delete/user?id=1      - 删除记录
@@ -52,12 +52,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	action, table := parsePath(r.URL.Path)
 	if action == "" || table == "" {
 		response.Error(w, "Invalid path. Use: /api/db/{action}/{table}", 400)
-		return
-	}
-
-	// 校验表名是否在白名单中
-	if !db.AllowedTables[table] {
-		response.Error(w, "Table not allowed", 403)
 		return
 	}
 
