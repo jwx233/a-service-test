@@ -19,16 +19,25 @@ func SetHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 }
 
-// JSON 返回成功响应（原始 []byte 数据）
+// JSON 返回成功响应，只提取 json 字段内容
 func JSON(w http.ResponseWriter, data []byte) {
 	SetHeaders(w)
-	// 解析原始数据
-	var rawData interface{}
+
+	// 解析原始数据，提取 json 字段
+	var rawData []map[string]interface{}
 	json.Unmarshal(data, &rawData)
+
+	// 只保留 json 字段的内容
+	var result []interface{}
+	for _, item := range rawData {
+		if jsonField, ok := item["json"]; ok {
+			result = append(result, jsonField)
+		}
+	}
 
 	resp := Response{
 		Code:    200,
-		Data:    rawData,
+		Data:    result,
 		Message: "success",
 	}
 	json.NewEncoder(w).Encode(resp)

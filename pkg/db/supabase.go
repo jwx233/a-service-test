@@ -82,17 +82,10 @@ func BuildFilter(r *http.Request) string {
 		}
 		value := values[0]
 
-		if key == "id" {
-			// id 查主键
-			filter := "id=eq." + value
-			debugLog("BuildFilter", "id filter", filter)
-			filters = append(filters, filter)
-		} else {
-			// 其他参数都查 jsonb 字段
-			filter := buildJsonFilter(key, value)
-			debugLog("BuildFilter", key+" filter", filter)
-			filters = append(filters, filter)
-		}
+		// 所有参数都查 jsonb 字段
+		filter := buildJsonFilter(key, value)
+		debugLog("BuildFilter", key+" filter", filter)
+		filters = append(filters, filter)
 	}
 
 	result := strings.Join(filters, "&")
